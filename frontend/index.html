@@ -1,0 +1,292 @@
+<html>
+<head>
+  <style type="text/css">
+  body {
+    margin: 0;
+    border-top: 10px solid #000000;
+    overflow: hidden;
+  }
+  #page {
+    width: 960px;
+    margin: 0 auto;
+  }
+  h1  {
+    background:url("/public/images/logo.png") no-repeat scroll right 0 transparent;
+    font-size:80pt;
+    height:355px;
+    line-height:355px;
+    margin:0;
+    text-shadow:0 0 10px #AAAAAA;
+  }
+  .row {
+    height: 250px;
+    width: 835px;
+    margin: 0 auto;
+  }
+  .cell {
+    float: left;
+    margin-right: 20px;
+    width: 265px;
+  }
+  .cell:last-child {
+    margin-right: 0;
+  }
+  .cell a {
+    display: block;
+    -moz-border-radius: 10px;
+    border: 2px solid #000000;
+    width: 261px;
+    height: 156px;
+    opacity: 0.7;
+    outline: none;
+  }
+  .cell a:hover {
+    color: #717171;
+    -moz-box-shadow: 3px 3px 25px;
+    opacity: 1;
+  }
+  .current a {
+    color: #717171;
+    -moz-box-shadow: 3px 3px 25px;
+    opacity: 1;
+  }
+
+  #proc {
+    background: url("/public/images/icon.png");
+  }
+  #mem {
+    background: url("/public/images/mem.png");
+  }
+  #cpu {
+    background: url("/public/images/cpu.png");
+  }
+  .opensuse {
+    background: url("/public/images/opensuse.png");
+  }
+  .ubuntu {
+    background: url("/public/images/ubuntu.png");
+  }
+  h2 {
+    text-align: center;
+    text-shadow: 0 0 5px #AAAAAA;
+  }
+  #plot {
+    width: 960px;
+    height: 350px;
+    display: none;
+  }
+  #plotbg {
+    width: 960px;
+    height: 350px;
+    display: none;
+    position: relative;
+    top: -350px;
+    line-height: 350px;
+    font-size: 80pt;
+    text-align: center;
+    z-index: -1;
+    color: #E1E1D5;
+    font-weight: bold;
+  }
+  #nav {
+    width: 100px;
+    height: 200px;
+    line-height: 200px;
+    -moz-border-radius: 10px;
+    background-color: #B3B3B3;
+    font-size: 125px;
+    font-weight: bold;
+    color: #eee;
+    position: absolute;
+    top: 218px;
+    opacity: 0.5;
+    display: none;
+  }
+  #nav:hover {
+    background-color: #505050;
+    color: #ffffff;
+    cursor: pointer;
+  }
+  .right {
+    right: 20px;
+  }
+  .left {
+    left: 20px;
+  }
+  #browse {
+    width: 960px;
+    height: 605px;
+    text-align: center;
+    margin: 0 203px;
+    position: absolute;
+    top: 10;
+    display: none;
+  }
+  </style>
+  <link rel="stylesheet" type="text/css" href="/public/css/jquery.jqplot.css" />
+  <script type="text/javascript" src="/public/js/jquery-1.4.2.min.js"></script>
+  <script type="text/javascript" src="/public/js/jquery.jqplot.js"></script>
+  <script type="text/javascript" src="/public/js/jqplot.canvasAxisTickRenderer.js"></script>
+  <script type="text/javascript" src="/public/js/jqplot.canvasTextRenderer.js"></script>
+
+  <script type="text/javascript">
+  $(function () {
+
+    // update host browser screen
+    var updateHosts = function (json) {
+      // clean up screen
+      var browse = $('#browse');
+      browse.children('div').remove();
+
+      // add hosts
+      for (var i=0; i<json.length; i++) {
+        var class = 'cell';
+        if (HOST && json[i][0] === HOST) {
+            class += ' current';
+        } else if (!HOST && i === 0){
+            class += ' current';
+        }
+        browse.append(
+          '<div class="' + class + '">\
+            <h2>' + json[i][0] + '</h2>\
+            <a class="' + json[i][1] +'" href="#"></a>\
+          </div>');
+      }
+
+      // add click action for host buttons
+      browse.children('.cell').click(function (e) {
+        var self = $(this);
+        self.parent().children('.current').removeClass('current');
+        self.addClass('current');
+        HOST = self.children('h2').text();
+      });
+
+    }
+
+    // right navigation button - shows host browser
+    $('.right').click(function (e) {
+      var self = $(this);
+      self.hide();
+      $('#page').css({'position': 'relative'})
+        .animate({'left': '-=1366px'}, function () {
+          var browse = $('#browse');
+          $.getJSON('/hosts', {}, updateHosts);
+          $('.left').show();
+          browse.show();
+        });
+
+    });
+
+    // left navigation button - shows plots
+    $('.left').click(function (e) {
+      var self = $(this);
+      self.hide();
+      $('#browse').hide();
+      $('#page').css({'position': 'relative'})
+        .animate({'left': '+=1366px'}, function () {
+          $('.right').show();
+        });
+    });
+
+    var timeout;
+
+    var CURRENT_PLUGIN;
+
+    $('.plugins .cell').click(function (e) {
+      if (CURRENT_PLUGIN) {
+        CURRENT_PLUGIN.removeClass('current');
+      }
+      var self = $(this)
+      self.addClass('current')
+      CURRENT_PLUGIN = self;
+
+      var h1 = $('h1');
+      var id = self.children('a').attr('id');
+      if (!h1.hasClass('hidden')) {
+        $('body').css({'border-top': '10px solid transparent'});
+        $('#page').css({'position': 'relative'}).animate({'top': '-=365px'}, function (e) {
+          h1.addClass('hidden');
+          $('.right').show();
+          $('#plot').show();
+          if (timeout) {
+            clearTimeout(timeout);
+          }
+          add_plot(id)
+        });
+      } else {
+          if (timeout) {
+            clearTimeout(timeout);
+          }
+          add_plot(id)
+      }
+    });
+
+    var plot;
+
+    var UPDATE_INTERVAL = 1*1000 - 500;
+    var HOST;
+
+    function redraw_plot(pl, data, options) {
+      for (var i= 0; i < data.length; i++) {
+        pl.series[i].data = data[i];
+      }
+      for (var ax in options.axes) {
+        pl.axes[ax]._ticks = []
+        if ('axes' in options && ax in options.axes && 'min' in options.axes[ax]) {
+          pl.axes[ax].min = options['axes'][ax].min;
+          pl.axes[ax].max = options['axes'][ax].max;
+        }
+        pl.axes[ax].numberTicks = null;
+        pl.axes[ax].tickInterval = null;
+        pl.axes[ax]._tickInterval =null;
+      }
+      pl.redraw();
+    }
+
+    var add_plot = function(id) {
+      $.getJSON('/'+id, {'host': HOST}, function (json) {
+        if (plot) {
+          plot.target.empty();
+        }
+        try {
+          json.options.axesDefaults.tickRenderer = $.jqplot.CanvasAxisTickRenderer;
+        } catch (e) {
+        }
+        $('#plotbg').text(json.host).show();
+        plot = $.jqplot('plot', json.data, json.options);
+      });
+      timeout = setTimeout(function () { add_plot(id); }, UPDATE_INTERVAL);
+    }
+
+  });
+  </script>
+</head>
+
+<body>
+  <div id="page">
+    <h1>Monitoring</h1>
+    <div class="plugins row">
+      <div class="cell">
+        <h2>Processes</h2>
+        <a id="proc" href="#"></a>
+      </div>
+      <div class="cell">
+        <h2>Memory</h2>
+        <a id="mem" href="#"></a>
+      </div>
+      <div class="cell">
+        <h2>CPU</h2>
+        <a id="cpu" href="#"></a>
+      </div>
+    </div>
+    <div id="plot">
+    </div>
+    <div id="plotbg">
+    </div>
+  </div>
+  <div id="nav" class="right">&gt;</div>
+  <div id="nav" class="left">&lt;</div>
+  <div id="browse">
+    <h2>Monitored hosts</h2>
+  </div>
+</body>
